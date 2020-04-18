@@ -17,7 +17,7 @@ view model =
 storyColumn : Model -> Element Msg
 storyColumn model =
   column [height fill, width <| fillPortion 6, Border.rounded 20, Background.color (rgb255 200 200 200), padding 30 ]
-  [(themePanel model),(currentStoryPanel model)]
+  [(themePanel model),(currentStoryPanel model),(button (Just Model.resetStory) "Nouvelle histoire")]
 
 updateColumn : Model -> Element Msg
 updateColumn model =
@@ -50,10 +50,13 @@ inputPanel model =
        [Input.multiline [Element.alignTop, height fill, Font.size 18] {label = (Input.labelHidden "Texte") , placeholder = Nothing, spellcheck = False, onChange = Model.updateStory, text = model.currentStory}]
 
 
+button : Maybe Msg ->  String -> Element Msg
+button msg text  = column [] [Input.button [Background.color (rgb255 150 150 150), Border.rounded 5, padding 5] {onPress = msg, label = Element.text text}]
+
 diceRollPanel : Model -> Element Msg
 diceRollPanel model =
-  row []
-      [column [] [Input.button [Background.color (rgb255 150 150 150), Border.rounded 5, padding 5] {onPress = Just Model.rollNextDice, label = Element.text "Continuer l'histoire"}],
+  row [][
+       button (Just Model.rollNextDice) ("Continuer l'histoire"),
        column [] []]
 
 renderDice : String -> Color -> Element Msg
@@ -63,5 +66,5 @@ renderDice msg color = el[](paragraph[Background.color color, width (px 70), hei
 
 
 mergeDiceAndStory : Model -> List (Element Msg)
-mergeDiceAndStory model = List.reverse (List.map2 (\story -> \dice -> el[](text (story))) model.story model.dices)
+mergeDiceAndStory model = List.reverse (List.map2 (\story -> \dice -> paragraph[Border.rounded 5][text (story)]) model.story model.dices)
    -- List.reverse (List.map2 (\story -> \dice -> Element.text ("("++dice++") "++story)]) model.story model.dices)

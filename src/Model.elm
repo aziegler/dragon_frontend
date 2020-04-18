@@ -1,20 +1,22 @@
-module Model exposing (Model, Msg, update, init, updateStory, rollNextDice, rollFinalDice)
+module Model exposing (Model, Msg, update, init, updateStory, rollNextDice, rollFinalDice, resetStory)
 
 import Random
+import Array
 
 type alias Model =
   { dices : List String,
     story : List String,
     currentStory : String,
     currentDice : String,
-    theme : String
+    theme : String,
+    diceList : List (List String)
   }
 
+init : () -> (Model, Cmd Msg)
+init _ =
+  ok (initial_model)
 
-init : Model
-init =
-  ok (Model [] [] "Ce jour-là" "Ce jour-là" "Salade de rêves")
-
+initial_model = Model [] [] "Ce jour-là" "Ce jour-là" "Salade de rêves" diceRollList
 
 themes = ["Le cimetière en folie", "Je me suis fait.e virer de l'école des magiciens"]
 diceRollList = [["Quand j'étais petit", "Un beau jour", "Je connais quelqu'un ", "La semaine dernière","Tout le monde pense","Je vous ai jamais dit"],
@@ -33,13 +35,18 @@ rollNextDice = RollNextDice
 rollFinalDice : Msg
 rollFinalDice = RollFinalDice
 
+resetStory : Msg
+resetStory = ResetStory
+
 type Msg
   = UpdateStory String
-  | RollNextDice Int
+  | RollNextDice
+  | ResetStory
+  | Rolled Int
   | RollFinalDice
 
 ok : Model -> (Model, Cmd Msg)
-ok model = (Success model, Cmd.none)
+ok model = (model, Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -48,18 +55,29 @@ update msg model =
       ok { model | currentStory = content }
 
     RollNextDice ->
-      ok rollNewDice (saveStory model)
+      (model, Random.generate Rolled (Random.int 1 6))
+
+    Rolled int ->
+      case model.diceList of
+      h::q -> let face = List.head (List.drop (int-1) h) in
+                  case face of
+                      Just text -> ok (rollNewDice text (saveStory {model | diceList = q}))
+                      Nothing -> ok (rollNewDice "Forced dice" (saveStory {model | diceList = q}))
+      [] -> ok (rollNewDice "Forced dice" (saveStory model))
 
     RollFinalDice ->
-      ok rollLastDice (saveStory model)
+      ok (rollLastDice (saveStory model))
+    ResetStory ->
+      ok (initial_model)
 
 saveStory : Model -> Model
 saveStory model =
-   { model | story = model.currentStory::model.story, dices = model.currentDice::model.dices }
+  let formatted_story = String.trim model.currentStory ++". " in
+   { model | story = formatted_story::model.story, dices = model.currentDice::model.dices }
 
-rollNewDice : Model -> Model
-rollNewDice model =
-  { model | currentDice = "Et à ce moment-là ...", currentStory = "Et à ce moment-là ..."}
+rollNewDice : String -> Model -> Model
+rollNewDice phrase model =
+  { model | currentDice = phrase, currentStory = phrase}
 
 rollLastDice : Model -> Model
 rollLastDice model =

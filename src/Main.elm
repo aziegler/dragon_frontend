@@ -1,6 +1,6 @@
 module Main exposing (main)
 import Browser
-import Model
+import Model exposing (..)
 import View
 
 
@@ -9,7 +9,7 @@ import View
 
 
 main =
-  Browser.element { init = Model.init, update = Model.update, subs = subscriptions, view = View.view }
+  Browser.element { init = Model.init, update = Model.update, subscriptions = subscriptions, view = View.view }
 
 
 subscriptions : Model -> Sub Msg
