@@ -1,4 +1,4 @@
-module Model exposing (Model, Msg, update, init, updateStory, rollNextDice, rollFinalDice, resetStory)
+module Model exposing (Model, Msg, update, init, updateStory, rollNextDice, rollFinalDice, resetStory, pickTheme)
 
 import Random
 import Array
@@ -8,17 +8,18 @@ type alias Model =
     story : List String,
     currentStory : String,
     currentDice : String,
-    theme : String,
-    diceList : List (List String)
+    theme : Maybe String,
+    diceList : List (List String),
+    themeList : List String
   }
 
 init : () -> (Model, Cmd Msg)
 init _ =
   ok (initial_model)
 
-initial_model = Model [] [] "Ce jour-là" "Ce jour-là" "Salade de rêves" diceRollList
+initial_model = Model [] [] "" "" Nothing diceRollList themes
 
-themes = ["Le cimetière en folie", "Je me suis fait.e virer de l'école des magiciens"]
+themes = ["Le cimetière en folie", "Je me suis fait.e virer de l'école des magiciens", "Je me transforme en Loup-Garou tous les lundis"]
 diceRollList = [["Quand j'étais petit", "Un beau jour", "Je connais quelqu'un ", "La semaine dernière","Tout le monde pense","Je vous ai jamais dit"],
                 ["En plus", "En réalité", "Et croyez-moi", "Et puis", "Alors moi", "Mais vous savez quoi"],
                 ["Pas de bol","Quand soudain","Donc, sans hésiter, ","En tout cas","A mon avis", "Alors voilà"],
@@ -38,10 +39,14 @@ rollFinalDice = RollFinalDice
 resetStory : Msg
 resetStory = ResetStory
 
+pickTheme : String -> Msg
+pickTheme = PickTheme
+
 type Msg
   = UpdateStory String
   | RollNextDice
   | ResetStory
+  | PickTheme String
   | Rolled Int
   | RollFinalDice
 
@@ -55,20 +60,28 @@ update msg model =
       ok { model | currentStory = content }
 
     RollNextDice ->
-      (model, Random.generate Rolled (Random.int 1 6))
+      if savable model
+        then ((saveStory model), Random.generate Rolled (Random.int 1 6))
+        else (model, Cmd.none)
 
     Rolled int ->
       case model.diceList of
       h::q -> let face = List.head (List.drop (int-1) h) in
                   case face of
-                      Just text -> ok (rollNewDice text (saveStory {model | diceList = q}))
-                      Nothing -> ok (rollNewDice "Forced dice" (saveStory {model | diceList = q}))
-      [] -> ok (rollNewDice "Forced dice" (saveStory model))
+                      Just text -> ok (rollNewDice text {model | diceList = q})
+                      Nothing -> ok (rollNewDice "Forced dice" {model | diceList = q})
+      [] -> ok (rollNewDice "Forced dice" model)
 
     RollFinalDice ->
       ok (rollLastDice (saveStory model))
     ResetStory ->
       ok (initial_model)
+    PickTheme theme ->
+      ({model | theme = Just theme}, Random.generate Rolled (Random.int 1 6))
+
+savable : Model -> Bool
+savable model =
+     String.length (String.trim model.currentStory) > String.length (String.trim model.currentDice)
 
 saveStory : Model -> Model
 saveStory model =
