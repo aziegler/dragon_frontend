@@ -66,7 +66,7 @@ diceRollPanel model =
        column [] []]
 
 renderDice : String -> Color -> Element Msg
-renderDice msg color = el[](paragraph[Background.color color, width (px 70), height (px 70), Border.rounded 5, Font.center, Font.size 16, centerY, padding 5][(text msg)])
+renderDice msg color = el[](paragraph[Background.color color, width (px 90), height (px 90), Border.rounded 5, Font.center, Font.size 16, centerY, padding 5][(text msg)])
 
 colorList = [(rgb255 217 217 40),(rgb255 217 100 30),(rgb255 230 170 170),(rgb255 40 40 217)]
 
