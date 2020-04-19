@@ -12,12 +12,14 @@ import Html exposing (Html)
 view : Model -> Html Msg
 view model =
   layout []<|
-    row [height fill, width fill, padding 20, spacing 30] [(storyColumn model), (updateColumn model)]
+    row [height fill, width fill, padding 20, spacing 30]
+        [(storyColumn model), (updateColumn model)]
 
 storyColumn : Model -> Element Msg
 storyColumn model =
   case model.theme of
-    Just themeText -> column [height fill, width <| fillPortion 6, Border.rounded 20, Background.color (rgb255 200 200 200), padding 30 ]
+    Just themeText ->
+      column [height fill, width <| fillPortion 6, Border.rounded 20, Background.color (rgb255 200 200 200), padding 30 ]
       [(themePanel themeText),(currentStoryPanel model),(button (Just Model.resetStory) "Nouvelle histoire")]
     Nothing -> column [height fill, width <| fillPortion 6, Border.rounded 20, Background.color (rgb255 200 200 200), padding 30, spacing 10 ]
        (List.map (\t -> (button (Just (Model.pickTheme t)) t)) model.themeList)
@@ -47,8 +49,8 @@ currentStoryPanel model =
 -- Input
 diceListPanel : Model -> Element Msg
 diceListPanel model =
-   let diceList = List.map2 (\d -> \c -> renderDice d c) (List.reverse(model.currentDice::model.dices)) colorList in
-   row[height (px 100), width fill,  spacing 10 ] diceList
+    let diceList = List.map renderDice (List.reverse(model.currentDice::model.dices))  in
+      row[height (px 100), width fill,  spacing 10 ] diceList
 
 inputPanel : Model -> Element Msg
 inputPanel model =
@@ -57,21 +59,44 @@ inputPanel model =
 
 
 button : Maybe Msg ->  String -> Element Msg
-button msg text  = column [] [Input.button [Background.color (rgb255 150 150 150), Border.rounded 5, padding 5] {onPress = msg, label = Element.text text}]
+button msg text  = coloredButton msg (rgb255 150 150 150) text
+
+coloredButton : Maybe Msg -> Color -> String -> Element Msg
+coloredButton msg color text  = coloredButtonWithFont msg color (rgb255 0 0 0) text
+
+coloredButtonWithFont : Maybe Msg -> Color -> Color -> String -> Element Msg
+coloredButtonWithFont msg color fontColor text  = column [] [Input.button [Background.color color, Border.rounded 5, padding 5, Font.color fontColor] {onPress = msg, label = Element.text text}]
 
 diceRollPanel : Model -> Element Msg
 diceRollPanel model =
-  row [][
+  row [spacing 5][
        button (Just Model.rollNextDice) ("Continuer l'histoire"),
+       coloredButton (Just (Model.rollColorDice "Blanc")) (rgb255 255 255 255) ("Lancer le dé blanc"),
+       coloredButtonWithFont (Just (Model.rollColorDice "Noir")) (rgb255 0 0 0) (rgb255 255 255 255) ("Lancer le dé noir"),
        column [] []]
 
-renderDice : String -> Color -> Element Msg
-renderDice msg color = el[](paragraph[Background.color color, width (px 90), height (px 90), Border.rounded 5, Font.center, Font.size 16, centerY, padding 5][(text msg)])
+renderDice : (String,String) -> Element Msg
+renderDice (color, msg) =
+  let rgbColor = List.filter (\(a,b,c) -> a == color) colorList in
+  case rgbColor of
+    (a,b,c)::_ -> el[](paragraph[Background.color b, width (px 90), height (px 90), Border.rounded 5, Font.center, Font.size 16, centerY, padding 5, Font.color c][(text msg)])
+    [] -> el[](paragraph[Background.color (rgb255 10 10 10), width (px 90), height (px 90), Border.rounded 5, Font.center, Font.size 16, centerY, padding 5][(text msg)])
 
-colorList = [(rgb255 217 217 40),(rgb255 217 100 30),(rgb255 230 170 170),(rgb255 40 40 217)]
 
+colorList = [("Jaune",(rgb255 255 255 0),(rgb255 0 0 0)),
+             ("Orange",(rgb255 217 100 30),(rgb255 0 0 0)),
+             ("Rouge",(rgb255 230 170 170),(rgb255 0 0 0)),
+             ("Bleu",(rgb255 40 40 217),(rgb255 0 0 0)),
+             ("Blanc",(rgb255 255 255 255),(rgb255 0 0 0)),
+             ("Noir",(rgb255 0 0 0),(rgb255 255 255 255))]
 
+renderStory : (String, String) -> Element Msg
+renderStory (color, story ) =
+  let rgbColor = List.filter (\(a,b,c) -> a == color) colorList in
+      case rgbColor of
+        (a,b,c)::_ -> paragraph[Background.color b, Font.color c][text (story)]
+        _ -> paragraph[][text (story)]
 
 mergeDiceAndStory : Model -> List (Element Msg)
-mergeDiceAndStory model = (List.map2 (\story -> \color -> paragraph[Background.color color ][text (story)]) (List.reverse  model.story) colorList)
+mergeDiceAndStory model = List.map renderStory (List.reverse  model.story)
    -- List.reverse (List.map2 (\story -> \dice -> Element.text ("("++dice++") "++story)]) model.story model.dices)
