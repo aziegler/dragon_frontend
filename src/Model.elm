@@ -1,115 +1,111 @@
-module Model exposing (Model, Msg, update, init, updateStory, rollNextDice, resetStory, pickTheme, rollColorDice)
+module Model exposing (..)
 
-import Random
-import Array
+import Http exposing (jsonBody)
+import Json.Decode exposing (Decoder, field)
+import Json.Encode as Encoder
 
-type alias Model =
-  { dices : List (String,String),
-    story : List (String,String),
-    currentStory : String,
-    currentDice : (String, String),
-    theme : Maybe String,
-    diceList : List (String, List String),
-    themeList : List String
-  }
+type alias Theme =
+    {
+        id: Maybe ObjectId,
+        author : String,
+        content : String,
+        category : String
+    }
+type alias ObjectId =
+    {
+        id : String
+    }
 
-init : () -> (Model, Cmd Msg)
-init _ =
-  ok (initial_model)
+type alias Dice =
+    {
+        id : Maybe ObjectId,
+        color : String,
+        faces : List String
+    }
 
-initial_model = Model [] [] "" ("","") Nothing diceRollList themes
+getThemes : ((Result Http.Error (List Theme)) -> msg) -> Cmd msg
+getThemes consMsg = Http.get { url = "http://localhost:8080/", expect = Http.expectJson consMsg themeListDecoder }
 
-themes = ["Le cimetière en folie", "Je me suis fait.e virer de l'école des magiciens", "Je me transforme en Loup-Garou tous les lundis", "Gaël apprend à programmer"]
-diceRollList = [
-                  ("Jaune", ["Quand j'étais petit", "Un beau jour", "Je connais quelqu'un ", "La semaine dernière","Tout le monde pense","Je vous ai jamais dit"]),
-                  ("Orange", ["En plus", "En réalité", "Et croyez-moi", "Et puis", "Alors moi", "Mais vous savez quoi"]),
-                  ("Rouge", ["Pas de bol","Quand soudain","Donc, sans hésiter, ","En tout cas","A mon avis", "Alors voilà"]),
-                  ("Bleu", ["Sauf que", "Et tenez-vous bien", "Et comme par magie", "Moralité","C'est ainsi que","Comme dirait mon pépé"])
-              ]
-
-otherDices = [("Blanc",["Et là, nooon", "Et là, Grrrrr", "Et là, Hmmmm", "Et là, Couic", "Et là, Tintintin", "Et là, paf"]),
-             ("Noir",["J'adore ce passage","Ah bon? Pourquoi ?","Et ton chien dans tout ça ?","T'as pas eu trop peur ?","Tu veux mon avis ?","Tu peux le prouver ?"])]
-
-
--- UPDATE
-updateStory : String -> Msg
-updateStory msg = UpdateStory msg
-
-rollNextDice : Msg
-rollNextDice = RollNextDice
-
-rollColorDice :String -> Msg
-rollColorDice = RollColorDice
-
-resetStory : Msg
-resetStory = ResetStory
-
-pickTheme : String -> Msg
-pickTheme = PickTheme
+getDices : ((Result Http.Error (List Dice)) -> msg) -> Cmd msg
+getDices consMsg = Http.get { url = "http://localhost:8080/dices", expect = Http.expectJson consMsg diceListDecoder }
 
 
+displayErr : Http.Error -> {model | error : Maybe String } -> ({model | error : Maybe String }, Cmd msg)
+displayErr err model =
+        case err of
+             Http.BadBody  s -> error model "Bad body"
+             Http.BadUrl   s -> error model "Bad URL"
+             Http.Timeout -> error model "Time Out"
+             Http.NetworkError -> error model "Network Error"
+             Http.BadStatus i -> error model "Bad Status"
+
+error : { modelType | error : Maybe String } -> String -> ({ modelType | error : Maybe String }, Cmd msg)
+error model errorMsg = ({model | error = Just errorMsg},Cmd.none)
+
+
+diceRequest : String -> Dice -> ((Result Http.Error (List Dice)) -> msg) -> Cmd msg
+diceRequest method dice cons= Http.request {url = "http://localhost:8080/dice", method = method, body = jsonBody (diceEncoder dice), expect = Http.expectJson cons diceListDecoder, headers = [], timeout = Nothing, tracker = Nothing }
+
+themeRequest : String -> Theme -> ((Result Http.Error (List Theme)) -> msg) -> Cmd msg
+themeRequest method theme cons = Http.request {url = "http://localhost:8080/theme", method = method, body = jsonBody (themeEncoder theme), expect = Http.expectJson cons themeListDecoder, headers = [], timeout = Nothing, tracker = Nothing }
+
+
+themeListDecoder : Decoder (List Theme)
+themeListDecoder =
+    (Json.Decode.list themeDecoder)
+
+diceListDecoder : Decoder (List Dice)
+diceListDecoder =
+    (Json.Decode.list diceDecoder)
+
+themeDecoder : Decoder Theme
+themeDecoder =
+    Json.Decode.map4 Theme
+        (field "_id" objectIdDecoder)
+        (field "author" Json.Decode.string)
+        (field "content" Json.Decode.string)
+        (field "category" Json.Decode.string)
 
 
 
-type Msg
-  = UpdateStory String
-  | RollNextDice
-  | RollColorDice String
-  | ResetStory
-  | PickTheme String
-  | Rolled (Maybe (String, List String)) Int
+objectIdDecoder : Decoder (Maybe ObjectId)
+objectIdDecoder =
+    Json.Decode.map (\s -> Just (ObjectId s)) (field "id" Json.Decode.string)
 
-ok : Model -> (Model, Cmd Msg)
-ok model = (model, Cmd.none)
-
-update : Msg -> Model -> (Model, Cmd Msg)
-update msg model =
-  case msg of
-    UpdateStory content ->
-      ok { model | currentStory = content }
-
-    RollNextDice ->
-      if savable model
-        then launchDice (saveStory model)
-        else (model, Cmd.none)
-
-    RollColorDice color ->
-      let diceValues = List.filter (\a -> Tuple.first a == color) otherDices in
-      case diceValues of
-          h::_ -> if savable model
-                    then ((saveStory model), Random.generate (Rolled (Just h)) (Random.int 1 6))
-                    else (model, Cmd.none)
-          _ -> (model, Cmd.none)
-
-    Rolled (Just (color, faces)) int ->
-      let text = List.head (List.drop (int-1) faces) in
-        case text of
-           Just content -> ok (rollNewDice (color, content) model)
-           _ -> ok (rollNewDice ("None","Forced dice") model)
-    Rolled Nothing int -> ok (rollNewDice ("None","Forced dice") model)
-
-    ResetStory ->
-      ok (initial_model)
-    PickTheme theme ->
-      launchDice {model | theme = Just theme}
-
-launchDice : Model -> (Model, Cmd Msg)
-launchDice model =
-  case model.diceList of
-    h::q -> ({model | diceList = q}, Random.generate (Rolled (List.head model.diceList)) (Random.int 1 6))
-    _ -> (model, Cmd.none)
+diceDecoder : Decoder Dice
+diceDecoder =
+    Json.Decode.map3 Dice
+        (field "_id" objectIdDecoder)
+        (field "color" Json.Decode.string)
+        (field "faces" (Json.Decode.list Json.Decode.string))
 
 
-savable : Model -> Bool
-savable model =
-     String.length (String.trim model.currentStory) > String.length (String.trim (Tuple.second model.currentDice))
+themeEncoder : Theme -> Encoder.Value
+themeEncoder theme =
+    let
+        fieldEncoder =
+            [ ( "author", Encoder.string theme.author )
+            , ( "content", Encoder.string theme.content )
+            , ( "category", Encoder.string theme.category )
+            ]
+    in case objectIdEncoder theme.id of
+        Nothing ->  Encoder.object <| fieldEncoder
+        Just enc -> Encoder.object <| (("_id",enc)::fieldEncoder)
 
-saveStory : Model -> Model
-saveStory model =
-  let formatted_story = String.trim model.currentStory ++". " in
-  let (color,_) = model.currentDice in
-   { model | story = (color,formatted_story)::model.story, dices = model.currentDice::model.dices, currentDice = ("",""), currentStory = "" }
 
-rollNewDice : (String,String) -> Model -> Model
-rollNewDice (color,phrase) model =
-  { model | currentDice = (color,phrase), currentStory = phrase}
+diceEncoder : Dice -> Encoder.Value
+diceEncoder dice =
+    let fieldEncoder =
+            [ ( "color", Encoder.string dice.color ),
+            ( "faces", Encoder.list Encoder.string dice.faces )]
+
+    in case objectIdEncoder dice.id of
+            Nothing ->  Encoder.object <| fieldEncoder
+            Just enc -> Encoder.object <| (("_id",enc)::fieldEncoder)
+
+objectIdEncoder : Maybe ObjectId -> Maybe Encoder.Value
+objectIdEncoder objectId =
+    case objectId of
+        Nothing -> Nothing
+        Just o -> Just (Encoder.object <| [("id", Encoder.string o.id )])
+
