@@ -1,5 +1,5 @@
 module GameView exposing (view)
-import GameModel exposing (Model, Msg(..))
+import GameModel exposing (Model, Msg(..), categoryList)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -22,10 +22,12 @@ storyColumn : Model -> Element Msg
 storyColumn model =
   case model.error of
   Just error -> coloredColumn 6 (rgb255 200 200 200) [(text error),(currentStoryPanel model),(button (Just ResetStory) "Nouvelle histoire")]
-  Nothing -> case model.theme of
-    Just theme ->
+  Nothing -> case model.category of
+    Nothing -> coloredColumn 6 (rgb255 200 200 200) ((button (Just ListTheme) "Mettre à jour")::(List.map (\t -> (button (Just (PickCategory t)) t)) (categoryList model)))
+    Just s -> case model.theme of
+      Just theme ->
         coloredColumn 6 (rgb255 200 200 200) [(themePanel theme.content),(currentStoryPanel model),(button (Just ResetStory) "Nouvelle histoire")]
-    Nothing ->
+      Nothing ->
         coloredColumn 6 (rgb255 200 200 200) ((button (Just ListTheme) "Mettre à jour")::(List.map (\t -> (button (Just (PickTheme t)) t.content)) model.themeList))
 
 

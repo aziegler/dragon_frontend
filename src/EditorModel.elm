@@ -28,7 +28,7 @@ updateEditor msg model =
         SaveTheme -> ({model | newTheme =  Theme Nothing "" "" ""} , themeRequest "POST" model.newTheme ThemeList)
         SaveDice -> ({model | newDice = Dice Nothing "" []} , diceRequest "POST" model.newDice DiceList)
         DeleteTheme theme -> (model, themeRequest "DELETE" theme ThemeList)
-        UpdateDice dice -> ({model | newDice = dice}, Cmd.none)
+        UpdateDice dice -> ({model | newDice = {dice | faces = dice.faces}}, Cmd.none)
         EditDice dice -> ({model | newDice = dice}, Cmd.none)
         DeleteDice dice -> (model, diceRequest "DELETE" dice DiceList)
 

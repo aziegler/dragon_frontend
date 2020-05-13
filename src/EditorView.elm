@@ -48,10 +48,13 @@ newDice : Dice -> Element EditorMsg
 newDice dice = column [spacing 10]
                   [row [height fill, width fill, spacing 12]
                   [ themeInput (\a -> UpdateDice {dice | color = a}) "Couleur" dice.color,
-                    themeInput (\c -> UpdateDice {dice | faces = (String.split "," c)}) "Face" (String.join ","(dice.faces))
+                    multiLineInput (\c -> UpdateDice {dice | faces = (String.split "\n" c)}) "Face" (String.join "\n"(dice.faces))
                   ],
                   row [height fill, width fill, padding 5, spacing 10]
                     [button (Just SaveDice) "Sauver"]]
+
+multiLineInput : (String -> EditorMsg) -> String -> String -> Element EditorMsg
+multiLineInput msg label content = Input.multiline [padding 2] {label=(Input.labelLeft [centerY] (text label)),onChange = msg, text = content, placeholder = Nothing, spellcheck = False}
 
 themeInput : (String -> EditorMsg) -> String -> String -> Element EditorMsg
 themeInput  msg label content = Input.text [padding 2] {label=(Input.labelLeft [centerY] (text label)),onChange = msg, text = content, placeholder = Nothing}
@@ -62,8 +65,11 @@ displayDice dice =
     let diceFaces = List.map (\d -> text (d++", ")) (dice.faces) in
                 column [height shrink, width fill, padding 5, Background.color bg, Font.color fg, spacing 10, Border.rounded 5]
                 [row [ spacing 10]
-                       (List.concat [[text "Color :", text dice.color, text "Faces :"],diceFaces]),
-                 row [ spacing 10] [button (Just (EditDice dice)) "Editer", button (Just (DeleteDice dice)) "Supprimer"]]
+                     [text "Color :", text dice.color,column [spacing 10]
+                     (List.map (\d -> text d) dice.faces) ],
+
+                 row [ spacing 10] [button (Just (EditDice dice)) "Editer", button (Just (DeleteDice dice)) "Supprimer"]
+                 ]
 
 displayTheme : Theme -> Element EditorMsg
 displayTheme theme = row [height shrink, width fill, padding 5, spacing 10]

@@ -1,4 +1,4 @@
-module GameModel exposing (Model,  update, init, Msg(..))
+module GameModel exposing (Model,  update, init, Msg(..), categoryList)
 
 import Json.Encode as Encoder
 import Model exposing (Dice, Theme, displayErr, getDices, getThemes)
@@ -13,6 +13,7 @@ type alias Model =
     currentStory : String,
     currentDice : (String, String),
     theme : Maybe Theme,
+    category : Maybe String,
     diceList : List Dice,
     themeList : List Theme,
     error : Maybe String,
@@ -25,7 +26,7 @@ init : () -> (Model, Cmd Msg)
 init _ = (initial_model, getThemes ThemeList)
 
 
-initial_model = Model [] [] "" ("","") Nothing [] [] Nothing False
+initial_model = Model [] [] "" ("","") Nothing Nothing [] [] Nothing False
 
 
 otherDices = [Dice Nothing "Blanc" ["Et là, nooon", "Et là, Grrrrr", "Et là, Hmmmm", "Et là, Couic", "Et là, Tintintin", "Et là, paf"],
@@ -39,6 +40,7 @@ type Msg
   | ResetStory
   | Saved (Result Http.Error ())
   | PickTheme Theme
+  | PickCategory String
   | ListTheme
   | ThemeList (Result Http.Error (List Theme))
   | DiceList (Result Http.Error (List Dice))
@@ -78,6 +80,7 @@ update msg model =
     Rolled Nothing _ -> finish model "Dé non trouvé"
     ResetStory -> init ()
     PickTheme theme -> launchDice {model | theme = Just theme}
+    PickCategory categoryName -> ({model | category = Just categoryName}, Cmd.none)
     ListTheme -> (model, getThemes ThemeList)
     ThemeList (Ok theme) -> ({model | themeList = theme}   , getDices DiceList)
     ThemeList (Err err) -> displayErr err model
@@ -93,6 +96,8 @@ storyEncoder list =
     Encoder.list (\( a, b ) -> Encoder.list identity [ Encoder.string a, Encoder.string b ]) list
 
 
+categoryList : Model -> List String
+categoryList model = let categories = List.map (\t -> t.category) model.themeList in List.foldl (\s -> \l -> if (List.member s l) then l else s::l ) [] categories
 
 launchDice : Model -> (Model, Cmd Msg)
 launchDice model =
