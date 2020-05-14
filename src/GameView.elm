@@ -66,7 +66,7 @@ inputPanel model =
 diceRollPanel : Model -> Element Msg
 diceRollPanel model =
   row [spacing 5]
-      (if model.finished then
+      (if model.story.finished then
         [button (Just ResetStory) ("C'est fini. Appuyer pour recommencer"), button (Just SaveStory) ("Partager cette histoire")]
       else
       [

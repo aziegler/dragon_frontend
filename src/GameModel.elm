@@ -2,7 +2,7 @@ module GameModel exposing (Model,  update, init, Msg(..), categoryList)
 
 import Json.Decode as Decoder exposing (Decoder, decodeValue, errorToString, field)
 import Json.Encode as Encoder
-import Model exposing (Dice, ObjectId, Theme, displayErr, error, getDices, getThemes, objectIdEncoder)
+import Model exposing (Dice, ObjectId, Theme, displayErr, error, getDices, getThemes, objectIdDecoder, objectIdEncoder)
 import Random
 import Http exposing (jsonBody)
 
@@ -16,7 +16,6 @@ type alias Model =
     diceList : List Dice,
     themeList : List Theme,
     error : Maybe String,
-    finished : Bool,
     message_sender : Encoder.Value -> Cmd Msg
   }
 
@@ -24,7 +23,8 @@ type alias Story =
   {
         id : Maybe ObjectId,
         theme : String,
-        story : List (String, String)
+        story : List (String, String),
+        finished : Bool
   }
 
 
@@ -33,7 +33,7 @@ init : (Encoder.Value -> Cmd Msg) -> () -> (Model, Cmd Msg)
 init sendMsg _ = (initial_model sendMsg, getThemes ThemeList)
 
 
-initial_model sendMsg = Model [] (Story Nothing "" []) "" ("","") Nothing Nothing [] [] Nothing False sendMsg
+initial_model sendMsg = Model [] (Story Nothing "" [] False) "" ("","") Nothing Nothing [] [] Nothing sendMsg
 
 
 otherDices = [Dice Nothing "Blanc" ["Et là, nooon", "Et là, Grrrrr", "Et là, Hmmmm", "Et là, Couic", "Et là, Tintintin", "Et là, paf"],
@@ -58,7 +58,9 @@ type Msg
 
 
 finish : Model -> String -> (Model, Cmd Msg)
-finish model error = ({model | finished = True, error = Just error}, sendStory model)
+finish model error =
+    let currentStory = model.story in
+    let newModel = {model | story = {currentStory | finished = True}, error = Just error} in (newModel, sendStory newModel)
 
 rollDice : Dice -> Cmd Msg
 rollDice dice =
@@ -117,7 +119,8 @@ setTheme model theme = let story = model.story in
 storyEncoder : Story -> Encoder.Value
 storyEncoder story =
   let fieldEncoder = [ ( "theme", Encoder.string story.theme ),
-                       ( "story", Encoder.list (\( a, b ) -> Encoder.list identity [ Encoder.string a, Encoder.string b ]) story.story )]
+                       ( "story", Encoder.list (\( a, b ) -> Encoder.list identity [ Encoder.string a, Encoder.string b ]) story.story ),
+                       ( "finished", Encoder.bool story.finished ) ]
     in case objectIdEncoder story.id of
         Nothing ->  Encoder.object <| fieldEncoder
         Just enc -> Encoder.object <| (("_id",enc)::fieldEncoder)
@@ -128,9 +131,12 @@ storyEncoder story =
 
 storyDecoder : Decoder Story
 storyDecoder =
-    Decoder.map2 (Story Nothing)
+    Decoder.map4 Story
+        (field "_id" objectIdDecoder)
         (field "theme" Decoder.string)
         (field "story" (Decoder.list (Decoder.map2 Tuple.pair (Decoder.index 0 Decoder.string) (Decoder.index 1 Decoder.string))))
+        (field "finished" Decoder.bool)
+
 
 
 categoryList : Model -> List String
