@@ -1,15 +1,14 @@
 module GameModel exposing (Model,  update, init, Msg(..), categoryList)
 
+import Json.Decode as Decoder exposing (Decoder, decodeValue, errorToString, field)
 import Json.Encode as Encoder
-import Model exposing (Dice, Theme, displayErr, getDices, getThemes)
+import Model exposing (Dice, ObjectId, Theme, displayErr, error, getDices, getThemes, objectIdEncoder)
 import Random
-import Array
 import Http exposing (jsonBody)
-import Json.Decode exposing (..)
 
 type alias Model =
   { dices : List (String,String),
-    story : List (String,String),
+    story : Story,
     currentStory : String,
     currentDice : (String, String),
     theme : Maybe Theme,
@@ -17,16 +16,24 @@ type alias Model =
     diceList : List Dice,
     themeList : List Theme,
     error : Maybe String,
-    finished : Bool
+    finished : Bool,
+    message_sender : Encoder.Value -> Cmd Msg
+  }
+
+type alias Story =
+  {
+        id : Maybe ObjectId,
+        theme : String,
+        story : List (String, String)
   }
 
 
 
-init : () -> (Model, Cmd Msg)
-init _ = (initial_model, getThemes ThemeList)
+init : (Encoder.Value -> Cmd Msg) -> () -> (Model, Cmd Msg)
+init sendMsg _ = (initial_model sendMsg, getThemes ThemeList)
 
 
-initial_model = Model [] [] "" ("","") Nothing Nothing [] [] Nothing False
+initial_model sendMsg = Model [] (Story Nothing "" []) "" ("","") Nothing Nothing [] [] Nothing False sendMsg
 
 
 otherDices = [Dice Nothing "Blanc" ["Et là, nooon", "Et là, Grrrrr", "Et là, Hmmmm", "Et là, Couic", "Et là, Tintintin", "Et là, paf"],
@@ -45,6 +52,7 @@ type Msg
   | ThemeList (Result Http.Error (List Theme))
   | DiceList (Result Http.Error (List Dice))
   | Rolled (Maybe Dice) Int
+  | NewStory Decoder.Value
   | SaveStory
 
 
@@ -55,7 +63,7 @@ finish model error = ({model | finished = True, error = Just error}, Cmd.none)
 rollDice : Dice -> Cmd Msg
 rollDice dice =
     let length = List.length dice.faces in
-        Random.generate (Rolled (Just dice)) (Random.int 1 (length + 1))
+        Random.generate (Rolled (Just dice)) (Random.int 1 length)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -75,11 +83,12 @@ update msg model =
     Rolled  (Just dice) int ->
       let text = List.head (List.drop (int-1) dice.faces) in
         case text of
-           Just content -> (rollNewDice (dice.color, content) model, Cmd.none)
-           _ -> finish model "Face non trouvée"
+           Just content ->
+             ((rollNewDice (dice.color, content) model), model.message_sender (storyEncoder model.story))
+           _ -> finish model ("Rolled a "++(String.fromInt int)++" on a "++String.fromInt (List.length dice.faces)++" faced dice")
     Rolled Nothing _ -> finish model "Dé non trouvé"
-    ResetStory -> init ()
-    PickTheme theme -> launchDice {model | theme = Just theme}
+    ResetStory -> init model.message_sender ()
+    PickTheme theme -> launchDice (setTheme model theme)
     PickCategory categoryName -> ({model | category = Just categoryName}, Cmd.none)
     ListTheme -> (model, getThemes ThemeList)
     ThemeList (Ok theme) -> ({model | themeList = theme}   , getDices DiceList)
@@ -87,13 +96,38 @@ update msg model =
     DiceList (Ok dices) -> ({model | diceList = dices}, Cmd.none)
     DiceList (Err err) -> displayErr err model
     SaveStory -> (model, Http.post {url = "http://localhost:8080/story",body = jsonBody (storyEncoder model.story), expect = Http.expectWhatever Saved})
-    Saved (Ok _) -> init()
+    Saved (Ok _) -> init model.message_sender ()
+    NewStory content ->
+        case (decodeValue storyDecoder content) of
+            Ok story -> ({model | story = story }, Cmd.none)
+            Err err ->  error model (errorToString err)
+
+
     Saved (Err err) -> displayErr err model
 
 
-storyEncoder : List (String,String) -> Encoder.Value
-storyEncoder list =
-    Encoder.list (\( a, b ) -> Encoder.list identity [ Encoder.string a, Encoder.string b ]) list
+setTheme : Model -> Theme -> Model
+setTheme model theme = let story = model.story in
+    let newStory = {story | theme = theme.content } in
+      {model | theme = Just theme, story = newStory}
+
+storyEncoder : Story -> Encoder.Value
+storyEncoder story =
+  let fieldEncoder = [ ( "theme", Encoder.string story.theme ),
+                       ( "story", Encoder.list (\( a, b ) -> Encoder.list identity [ Encoder.string a, Encoder.string b ]) story.story )]
+    in case objectIdEncoder story.id of
+        Nothing ->  Encoder.object <| fieldEncoder
+        Just enc -> Encoder.object <| (("_id",enc)::fieldEncoder)
+
+
+
+
+
+storyDecoder : Decoder Story
+storyDecoder =
+    Decoder.map2 (Story Nothing)
+        (field "theme" Decoder.string)
+        (field "story" (Decoder.list (Decoder.map2 Tuple.pair (Decoder.index 0 Decoder.string) (Decoder.index 1 Decoder.string))))
 
 
 categoryList : Model -> List String
@@ -114,7 +148,9 @@ saveStory : Model -> Model
 saveStory model =
   let formatted_story = String.trim model.currentStory ++". " in
   let (color,_) = model.currentDice in
-   { model | story = (color,formatted_story)::model.story, dices = model.currentDice::model.dices, currentDice = ("",""), currentStory = "" }
+  let oldStory = model.story in
+  let newStory = { oldStory | story = (color,formatted_story)::(oldStory.story) } in
+   { model | story = newStory , dices = model.currentDice::model.dices, currentDice = ("",""), currentStory = "" }
 
 rollNewDice : (String,String) -> Model -> Model
 rollNewDice (color,phrase) model =

@@ -79,5 +79,5 @@ diceRollPanel model =
 
 
 mergeDiceAndStory : Model -> List (Element Msg)
-mergeDiceAndStory model = List.map renderStory (List.reverse  model.story)
+mergeDiceAndStory model = List.map renderStory (List.reverse  model.story.story)
    -- List.reverse (List.map2 (\story -> \dice -> Element.text ("("++dice++") "++story)]) model.story model.dices)
