@@ -58,12 +58,15 @@ type Msg
 
 
 finish : Model -> String -> (Model, Cmd Msg)
-finish model error = ({model | finished = True, error = Just error}, Cmd.none)
+finish model error = ({model | finished = True, error = Just error}, sendStory model)
 
 rollDice : Dice -> Cmd Msg
 rollDice dice =
     let length = List.length dice.faces in
         Random.generate (Rolled (Just dice)) (Random.int 1 length)
+
+sendStory : Model -> Cmd Msg
+sendStory model = model.message_sender (storyEncoder model.story)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -77,14 +80,13 @@ update msg model =
       let diceValues = List.filter (\a -> a.color == color) otherDices in
       case diceValues of
           h::_ -> if savable model
-                    then ((saveStory model), rollDice h)
+                    then ((saveStory model), Cmd.batch[rollDice h,sendStory model])
                     else (model, Cmd.none)
           _ -> finish model "Couleur non trouvée"
     Rolled  (Just dice) int ->
       let text = List.head (List.drop (int-1) dice.faces) in
         case text of
-           Just content ->
-             ((rollNewDice (dice.color, content) model), model.message_sender (storyEncoder model.story))
+           Just content -> ((rollNewDice (dice.color, content) model), Cmd.none)
            _ -> finish model ("Rolled a "++(String.fromInt int)++" on a "++String.fromInt (List.length dice.faces)++" faced dice")
     Rolled Nothing _ -> finish model "Dé non trouvé"
     ResetStory -> init model.message_sender ()
@@ -99,10 +101,11 @@ update msg model =
     Saved (Ok _) -> init model.message_sender ()
     NewStory content ->
         case (decodeValue storyDecoder content) of
-            Ok story -> ({model | story = story }, Cmd.none)
+            Ok story -> let theme = List.filter (\t -> t.content == story.theme) model.themeList in
+              case theme of
+                  h::_ -> ({model | story = story, theme = Just h }, Cmd.none)
+                  [] -> ({model | story = story, theme = Just (Theme Nothing "" story.theme "") }, Cmd.none)
             Err err ->  error model (errorToString err)
-
-
     Saved (Err err) -> displayErr err model
 
 
@@ -136,7 +139,7 @@ categoryList model = let categories = List.map (\t -> t.category) model.themeLis
 launchDice : Model -> (Model, Cmd Msg)
 launchDice model =
   case model.diceList of
-    h::q -> ({model | diceList = q}, rollDice h)
+    h::q -> ({model | diceList = q}, Cmd.batch [rollDice h, sendStory model])
     _ -> finish model "Plus de dés"
 
 
