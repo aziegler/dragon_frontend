@@ -30,7 +30,7 @@ type alias Story =
 
 
 init : (Encoder.Value -> Cmd Msg) -> () -> (Model, Cmd Msg)
-init sendMsg _ = (initial_model sendMsg, getThemes ThemeList)
+init sendMsg _ = (initial_model sendMsg, Cmd.batch [getThemes ThemeList])
 
 
 initial_model sendMsg = Model [] (Story Nothing "" [] False) "" ("","") Nothing Nothing [] [] Nothing sendMsg
@@ -68,7 +68,7 @@ rollDice dice =
         Random.generate (Rolled (Just dice)) (Random.int 1 length)
 
 sendStory : Model -> Cmd Msg
-sendStory model = model.message_sender (storyEncoder model.story)
+sendStory model = model.message_sender (Encoder.object [("story",(storyEncoder model.story))])
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -95,18 +95,23 @@ update msg model =
     PickTheme theme -> launchDice (setTheme model theme)
     PickCategory categoryName -> ({model | category = Just categoryName}, Cmd.none)
     ListTheme -> (model, getThemes ThemeList)
-    ThemeList (Ok theme) -> ({model | themeList = theme}   , getDices DiceList)
+    ThemeList (Ok theme) -> ({model | themeList = theme}   , Cmd.batch [getDices DiceList])
     ThemeList (Err err) -> displayErr err model
-    DiceList (Ok dices) -> ({model | diceList = dices}, Cmd.none)
+    DiceList (Ok dices) -> ({model | diceList = dices}, model.message_sender (Encoder.string "Hello"))
     DiceList (Err err) -> displayErr err model
-    SaveStory -> (model, Http.post {url = "http://localhost:8080/story",body = jsonBody (storyEncoder model.story), expect = Http.expectWhatever Saved})
+    SaveStory -> (model, Http.post {url = "http://localhost:8080/dragon/story",body = jsonBody (storyEncoder model.story), expect = Http.expectWhatever Saved})
     Saved (Ok _) -> init model.message_sender ()
     NewStory content ->
         case (decodeValue storyDecoder content) of
             Ok story -> let theme = List.filter (\t -> t.content == story.theme) model.themeList in
-              case theme of
-                  h::_ -> ({model | story = story, theme = Just h }, Cmd.none)
-                  [] -> ({model | story = story, theme = Just (Theme Nothing "" story.theme "") }, Cmd.none)
+              let parsedTheme = case theme of
+                    h::_ -> h
+                    [] ->  (Theme Nothing "" story.theme "")
+              in case model.theme of
+                    Just _ -> ({model | story = story}, Cmd.none)
+                    Nothing -> launchDice {model | category = Just parsedTheme.category, story = story, theme = Just parsedTheme }
+
+
             Err err ->  error model (errorToString err)
     Saved (Err err) -> displayErr err model
 

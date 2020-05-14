@@ -12,7 +12,7 @@
     node: document.getElementById('DragonGame')
   });
 
-var socket = new WebSocket('ws://localhost:8080/broadcast');
+var socket = new WebSocket('ws://localhost:8080/dragon/broadcast');
 
 app.ports.sendMessage.subscribe(function(message) {
     socket.send(JSON.stringify(message));

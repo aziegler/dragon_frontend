@@ -24,10 +24,10 @@ type alias Dice =
     }
 
 getThemes : ((Result Http.Error (List Theme)) -> msg) -> Cmd msg
-getThemes consMsg = Http.get { url = "http://localhost:8080/", expect = Http.expectJson consMsg themeListDecoder }
+getThemes consMsg = Http.get { url = "http://localhost:8080/dragon/", expect = Http.expectJson consMsg themeListDecoder }
 
 getDices : ((Result Http.Error (List Dice)) -> msg) -> Cmd msg
-getDices consMsg = Http.get { url = "http://localhost:8080/dices", expect = Http.expectJson consMsg diceListDecoder }
+getDices consMsg = Http.get { url = "http://localhost:8080/dragon/dices", expect = Http.expectJson consMsg diceListDecoder }
 
 
 displayErr : Http.Error -> {model | error : Maybe String } -> ({model | error : Maybe String }, Cmd msg)
@@ -44,10 +44,10 @@ error model errorMsg = ({model | error = Just errorMsg},Cmd.none)
 
 
 diceRequest : String -> Dice -> ((Result Http.Error (List Dice)) -> msg) -> Cmd msg
-diceRequest method dice cons= Http.request {url = "http://localhost:8080/dice", method = method, body = jsonBody (diceEncoder dice), expect = Http.expectJson cons diceListDecoder, headers = [], timeout = Nothing, tracker = Nothing }
+diceRequest method dice cons= Http.request {url = "http://localhost:8080/dragon/dice", method = method, body = jsonBody (diceEncoder dice), expect = Http.expectJson cons diceListDecoder, headers = [], timeout = Nothing, tracker = Nothing }
 
 themeRequest : String -> Theme -> ((Result Http.Error (List Theme)) -> msg) -> Cmd msg
-themeRequest method theme cons = Http.request {url = "http://localhost:8080/theme", method = method, body = jsonBody (themeEncoder theme), expect = Http.expectJson cons themeListDecoder, headers = [], timeout = Nothing, tracker = Nothing }
+themeRequest method theme cons = Http.request {url = "http://localhost:8080/dragon/theme", method = method, body = jsonBody (themeEncoder theme), expect = Http.expectJson cons themeListDecoder, headers = [], timeout = Nothing, tracker = Nothing }
 
 
 themeListDecoder : Decoder (List Theme)

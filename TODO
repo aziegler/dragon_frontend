@@ -2,16 +2,11 @@
 - Dés infinis
 - Limiter les dés blancs et noirs
 - Client/serveur
-  - Svgde des histoires
-      - Passe par le serveur => almost done
+  - Affichage des histoires sauvegardées
   - Mode plusieurs joueurs
-      - Broadcast de base
       - Plusieurs modes de jeu (FFA ou chacun son tour ou un qui joue un qui interrompt)
       - Gestion de plusieurs parties en parallèle ?
 - Responsive
 - Autocomplétion dans l'admin
 - Règles sur les dés => Admin plus avancé
 
-
-======================= BUGS ===================
-- Début de partie avec une histoire commencée sur l'autre client
